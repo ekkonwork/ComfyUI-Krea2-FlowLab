@@ -9,8 +9,9 @@ import latent_preview
 from .k2_math import PRESETS
 from .k2_sampler import sample_k2_flow
 from .k2_schedule import build_k2_sigmas
+from .profiles import MANUAL_PROFILE, PROFILE_CHOICES, resolve_full_profile
 
-_VERSION = "0.1.1"
+_VERSION = "0.2.0"
 _CATEGORY = "sampling/custom_sampling/Krea2 FlowLab"
 
 
@@ -115,14 +116,20 @@ class K2AdvancedSampler:
                 "eta_start": ("FLOAT", {"default": 0.25, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "eta_end": ("FLOAT", {"default": 0.72, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "s_noise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.01}),
-            }
+            },
+            "optional": {
+                "full_profile": (PROFILE_CHOICES, {"default": MANUAL_PROFILE}),
+            },
         }
 
     RETURN_TYPES = ("LATENT", "LATENT", "OPTIONS")
     RETURN_NAMES = ("output", "denoised", "options")
     FUNCTION = "sample"
     CATEGORY = _CATEGORY
-    DESCRIPTION = "All-in-one Krea-2 sampler. It does not modify prompts, conditioning, model weights, VAE, or downstream PiD."
+    DESCRIPTION = (
+        "All-in-one Krea-2 sampler. Select '00 Manual widgets' to use the visible controls; "
+        "any other full_profile overrides preset, schedule and stochastic settings together."
+    )
 
     def sample(
         self,
@@ -144,7 +151,32 @@ class K2AdvancedSampler:
         eta_start,
         eta_end,
         s_noise,
+        full_profile=MANUAL_PROFILE,
     ):
+        resolved = resolve_full_profile(
+            full_profile,
+            preset=preset,
+            schedule_profile=schedule_profile,
+            correction_strength=correction_strength,
+            curvature_threshold=curvature_threshold,
+            trust_ratio=trust_ratio,
+            local_trust=local_trust,
+            eta=eta,
+            eta_start=eta_start,
+            eta_end=eta_end,
+            s_noise=s_noise,
+        )
+        preset = resolved.preset
+        schedule_profile = resolved.schedule_profile
+        correction_strength = resolved.correction_strength
+        curvature_threshold = resolved.curvature_threshold
+        trust_ratio = resolved.trust_ratio
+        local_trust = resolved.local_trust
+        eta = resolved.eta
+        eta_start = resolved.eta_start
+        eta_end = resolved.eta_end
+        s_noise = resolved.s_noise
+
         latent = latent_image.copy()
         latent_samples = comfy.sample.fix_empty_latent_channels(
             model,
@@ -156,7 +188,12 @@ class K2AdvancedSampler:
 
         sigmas = build_k2_sigmas(model, steps, denoise, schedule_profile)
         if sigmas.numel() == 0:
-            options = {"sampler_name": "k2_flow", "scheduler": f"k2_{schedule_profile}"}
+            options = {
+                "sampler_name": "k2_flow",
+                "scheduler": f"k2_{schedule_profile}",
+                "full_profile": full_profile,
+                "resolved_profile": resolved.to_dict(),
+            }
             return (latent, latent, options)
 
         noise = comfy.sample.prepare_noise(latent_samples, seed, latent.get("batch_index"))
@@ -209,6 +246,10 @@ class K2AdvancedSampler:
             "steps": int(steps),
             "eta": float(eta),
             "version": _VERSION,
+            "full_profile": full_profile,
+            "profile_tier": resolved.tier,
+            "profile_description": resolved.description,
+            "resolved_profile": resolved.to_dict(),
         }
         return (out, denoised_out, options)
 
