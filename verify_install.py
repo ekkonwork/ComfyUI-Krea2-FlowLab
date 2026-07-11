@@ -11,13 +11,16 @@ def main() -> int:
     sys.path.insert(0, str(comfy_root))
     sys.path.insert(0, str(root.parent))
 
-    # ComfyUI initializes its device policy while importing comfy.samplers.
-    # GitHub runners use CPU-only PyTorch, so select ComfyUI's own supported
-    # CPU mode before that import. GPU installations are left untouched.
+    # ComfyUI parses an empty argument list during library-style imports unless
+    # argument parsing is explicitly enabled. Enable its official parser before
+    # selecting CPU mode on CPU-only CI runners. GPU installations are untouched.
     try:
         import torch
-        if not torch.cuda.is_available() and "--cpu" not in sys.argv:
-            sys.argv.append("--cpu")
+        import comfy.options
+        if not torch.cuda.is_available():
+            comfy.options.enable_args_parsing(True)
+            if "--cpu" not in sys.argv:
+                sys.argv.append("--cpu")
     except Exception:
         pass
 
