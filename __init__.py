@@ -6,7 +6,7 @@
 if __package__:
     from .nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 
-    print("[K2 FlowLab] v0.1.1 loaded: K2 Advanced Sampler, K2 Flow Sampler, K2 Native Scheduler")
+    print("[K2 FlowLab] v0.2.0 loaded: K2 Advanced Sampler, K2 Flow Sampler, K2 Native Scheduler, 21 full profiles")
 else:  # pragma: no cover - tooling-only fallback
     NODE_CLASS_MAPPINGS = {}
     NODE_DISPLAY_NAME_MAPPINGS = {}
